@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using NebulaModel.Logger;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -29,6 +30,39 @@ namespace NebulaWorld.Factory
                 new Vector4(y.x, y.y, y.z, 0),
                 new Vector4(z.x, z.y, z.z, 0),
                 new Vector4(point0.x, point0.y, point0.z, 1)
+            );
+        }
+
+        private static Matrix4x4 Get3DPoint3DPlaneAs2DPointProjectionMatrixWithCircularOrigin(Vector3 point0, Vector3 point1, Vector3 point2)
+        {
+            // Adapted from https://stackoverflow.com/a/52163563/13620003
+
+            var x = point1 - point0;
+            var y = point2 - point0;
+            var z = Vector3.Cross(x, y);
+
+
+            var zsl = z.sqrMagnitude;
+            //if (zsl < 10e-14) return false; // area of the triangle is too small (you may additionally check the points for colinearity if you are paranoid)
+            var izsl2 = 1f / (2f * zsl);
+            var xx = Vector3.Dot(x, x);
+            var yy = Vector3.Dot(y, y);
+            var v = point2 - point1;
+
+            var circCenter = point0 + (y * xx * Vector3.Dot(y, v) - x * yy * Vector3.Dot(x, v)) * izsl2;
+            //var circRadius = Mathf.Sqrt(xx * yy * Vector3.Dot(v, v) * izsl2 * 0.5f);
+            //var circAxis = z / Mathf.Sqrt(zsl);
+
+            y = Vector3.Cross(z, x);
+            x.Normalize();
+            z.Normalize();
+            y.Normalize();
+
+            return new Matrix4x4(
+                new Vector4(x.x, x.y, x.z, 0),
+                new Vector4(y.x, y.y, y.z, 0),
+                new Vector4(z.x, z.y, z.z, 0),
+                new Vector4(circCenter.x, circCenter.y, circCenter.z, 1)
             );
         }
 
@@ -269,6 +303,8 @@ namespace NebulaWorld.Factory
                 int endIndex;
                 for (int j = 0; j < differentialIndexes.Count; j++)
                 {
+                    
+
                     var differentialIndex = differentialIndexes[j];
                     var surfaceRelativeSequence = simmilarityMap[differentialIndex];
 
@@ -284,6 +320,8 @@ namespace NebulaWorld.Factory
                         w.Write(repCount);
                         if (surfaceRelativeSequence)
                         {
+                            var projectedPointList = "";
+
                             // TODO: If the repcount is 1 (and maybe 2 too) we should just write the original rotations (and dont forget to do the same in the decoding)
 
                             w.Write(surfaceRelativeRotations[startIndex].x);
@@ -293,7 +331,11 @@ namespace NebulaWorld.Factory
 
                             // TODO: How we pick the points might cause problems when the cricle that this section form's more than 2/3 of the circumvence of the planet,
                             // we should compensate for this
-                            var matrixM = Get3DPoint3DPlaneAs2DPointProjectionMatrix(cargoPath.pointPos[startIndex + (int)Math.Ceiling(a: repCount / 2)], cargoPath.pointPos[startIndex], cargoPath.pointPos[endIndex]);
+                            //var matrixM = Get3DPoint3DPlaneAs2DPointProjectionMatrix(cargoPath.pointPos[startIndex + (int)Math.Ceiling(a: repCount / 2)], cargoPath.pointPos[startIndex], cargoPath.pointPos[endIndex]);
+                            var p0 = cargoPath.pointPos[startIndex];
+                            var p1 = cargoPath.pointPos[startIndex + (int)Math.Ceiling(a: repCount / 2)];
+                            var p2 = cargoPath.pointPos[endIndex];
+                            var matrixM = Get3DPoint3DPlaneAs2DPointProjectionMatrixWithCircularOrigin(p0, p1, p2);
                             w.Write(matrixM[0, 0]);
                             w.Write(matrixM[1, 0]);
                             w.Write(matrixM[2, 0]);
@@ -312,16 +354,28 @@ namespace NebulaWorld.Factory
                             //w.Write(matrixM[3, 3]); // This is always 1
 
                             var matrixMInv = matrixM.inverse;
+
+                            var r = matrixMInv.MultiplyPoint3x4(p0).magnitude;
+                            r += matrixMInv.MultiplyPoint3x4(p1).magnitude;
+                            r += matrixMInv.MultiplyPoint3x4(p2).magnitude;
+                            r /= 3f;
+                            w.Write(r);
+
                             for (int i = 0; i < repCount; i++)
                             {
                                 // Write 2D coordinates on plane
                                 // TODO: For the first one we can probably just take the origin points from matrixM (not acctually the first one but the (int)Math.Ceiling(a: repCount / 2) th one)
 
                                 var projectedPoint = matrixMInv.MultiplyPoint3x4(cargoPath.pointPos[startIndex + i]); // Fuck yea!!!
-                                w.Write(projectedPoint.x);
-                                w.Write(projectedPoint.y);
+                                //w.Write(projectedPoint.x);
+                                //w.Write(projectedPoint.y);
+                                var atan2Angle = Mathf.Atan2(projectedPoint.y, projectedPoint.x);
+                                w.Write(atan2Angle);
+
+                                projectedPointList += $"{projectedPoint.x}, {projectedPoint.y}\n";
                             }
 
+                            //Debug.Log("List of projected points:\n" + projectedPointList);
                         }
                         else
                         {
@@ -356,6 +410,8 @@ namespace NebulaWorld.Factory
                     w.Write(repCountForEnd);
                     if (surfaceRelativeSequenceForEnd)
                     {
+                        var projectedPointList = "";
+
                         // TODO: If the repcount is 1 (and maybe 2 too) we should just write the original rotations (and dont forget to do the same in the decoding)
 
                         w.Write(surfaceRelativeRotations[startIndex].x);
@@ -365,7 +421,11 @@ namespace NebulaWorld.Factory
 
                         // TODO: How we pick the points might cause problems when the cricle that this section form's more than 2/3 of the circumvence of the planet,
                         // we should compensate for this
-                        var matrixM = Get3DPoint3DPlaneAs2DPointProjectionMatrix(cargoPath.pointPos[startIndex + (int)Math.Ceiling(a: repCountForEnd / 2)], cargoPath.pointPos[startIndex], cargoPath.pointPos[endIndex]);
+                        //var matrixM = Get3DPoint3DPlaneAs2DPointProjectionMatrix(cargoPath.pointPos[startIndex + (int)Math.Ceiling(a: repCountForEnd / 2)], cargoPath.pointPos[startIndex], cargoPath.pointPos[endIndex]);
+                        var p0 = cargoPath.pointPos[startIndex];
+                        var p1 = cargoPath.pointPos[startIndex + (int)Math.Ceiling(a: repCountForEnd / 2)];
+                        var p2 = cargoPath.pointPos[endIndex];
+                        var matrixM = Get3DPoint3DPlaneAs2DPointProjectionMatrixWithCircularOrigin(p0, p1, p2);             
                         w.Write(matrixM[0, 0]);
                         w.Write(matrixM[1, 0]);
                         w.Write(matrixM[2, 0]);
@@ -384,16 +444,28 @@ namespace NebulaWorld.Factory
                         //w.Write(matrixM[3, 3]); // This is always 1
 
                         var matrixMInv = matrixM.inverse;
+
+                        var r = matrixMInv.MultiplyPoint3x4(p0).magnitude;
+                        r += matrixMInv.MultiplyPoint3x4(p1).magnitude;
+                        r += matrixMInv.MultiplyPoint3x4(p2).magnitude;
+                        r /= 3f;
+                        w.Write(r);
+
                         for (int i = 0; i < repCountForEnd; i++)
                         {
                             // Write 2D coordinates on plane
                             // TODO: For the first one we can probably just take the origin points from matrixM (not acctually the first one but the (int)Math.Ceiling(a: repCount / 2) th one)
 
                             var projectedPoint = matrixMInv.MultiplyPoint3x4(cargoPath.pointPos[startIndex + i]); // Fuck yea!!!
-                            w.Write(projectedPoint.x);
-                            w.Write(projectedPoint.y);
+                            //w.Write(projectedPoint.x);
+                            //w.Write(projectedPoint.y);
+                            var atan2Angle = Mathf.Atan2(projectedPoint.y, projectedPoint.x);
+                            w.Write(atan2Angle);
+
+                            projectedPointList += $"{projectedPoint.x}, {projectedPoint.y}\n";
                         }
 
+                        //Debug.Log("List of projected points:\n" + projectedPointList);
                     }
                     else
                     {

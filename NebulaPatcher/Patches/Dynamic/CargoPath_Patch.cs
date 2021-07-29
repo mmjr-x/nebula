@@ -1,4 +1,4 @@
-using HarmonyLib;
+﻿using HarmonyLib;
 using System.IO;
 using UnityEngine;
 using System.Collections.Generic;
@@ -123,6 +123,8 @@ namespace NebulaPatcher.Patches.Dynamic
                     var isThereAPreviosRelativeRotation = false;
                     var planarMatrix = new Matrix4x4();
                     var isThereAPlanarMatrix = false;
+                    var intersectingCircleRadius = 0f;
+                    var isThereAIntersectingCircleRadius = false;
                     for (int i = 0; i < repCount; i++)
                     {
                         if (sameRelativeRotationAsPrevious)
@@ -145,7 +147,15 @@ namespace NebulaPatcher.Patches.Dynamic
                                 isThereAPlanarMatrix = true;
                             }
 
-                            var planarPosition = new Vector3(r.ReadSingle(), r.ReadSingle());
+                            if (!isThereAIntersectingCircleRadius)
+                            {
+                                intersectingCircleRadius = r.ReadSingle();
+                                isThereAIntersectingCircleRadius = true;
+                            }
+
+                            //var planarPosition = new Vector3(r.ReadSingle(), r.ReadSingle());
+                            var atan2Angle = r.ReadSingle();
+                            var planarPosition = new Vector3(intersectingCircleRadius * Mathf.Cos(atan2Angle), intersectingCircleRadius * Mathf.Sin(atan2Angle));
                             __instance.pointPos[j] = planarMatrix.MultiplyPoint3x4(planarPosition);
 
                             var originalPosition = __instance.pointPos[j];
@@ -173,6 +183,11 @@ namespace NebulaPatcher.Patches.Dynamic
                             if (isThereAPlanarMatrix)
                             {
                                 isThereAPlanarMatrix = false;
+                            }
+
+                            if (isThereAIntersectingCircleRadius)
+                            {
+                                isThereAIntersectingCircleRadius = false;
                             }
 
                         }
