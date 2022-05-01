@@ -8,12 +8,16 @@ using NebulaModel.Packets.GameHistory;
 using NebulaModel.Packets.GameStates;
 using NebulaModel.Packets.Universe;
 using NebulaModel.Utils;
+using NebulaNetwork.STUNT;
 using NebulaWorld;
+using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using UnityEngine;
 using WebSocketSharp;
 using WebSocketSharp.Server;
+using LumiSoft.Net.STUN.Client;
+using NebulaModel.Logger;
 
 namespace NebulaNetwork
 {
@@ -66,7 +70,33 @@ namespace NebulaNetwork
             PacketProcessor.SimulateLatency = true;
 #endif
 
-            socket = new WebSocketServer(System.Net.IPAddress.IPv6Any, port);
+            // STUNT stuff
+            Socket stuntSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            stuntSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            //var iPEndPoint = new IPEndPoint(IPAddress.Any, 0);
+            //stuntSocket.Bind(iPEndPoint);
+            stuntSocket.Bind(new IPEndPoint(IPAddress.Any, 0));
+            STUN_Result result = STUNT_Client.Query("stun.stunprotocol.org", 3478, stuntSocket);
+            Log.Info("STUNT info:");
+            Log.Info($"NetType: {result.NetType}");
+            Log.Info($"LocalEndPoint: {stuntSocket.LocalEndPoint}");
+            Log.Info($"PublicEndPoint: {result.PublicEndPoint}");
+
+            if (result.PublicEndPoint != null)
+            {             
+                //var localIp = stuntSocket.LocalEndPoint.ToString().Split(':')[0];
+                //var localPort = stuntSocket.LocalEndPoint.ToString().Split(':')[1];
+                var localIPEndPoint = (stuntSocket.LocalEndPoint as IPEndPoint);
+                Log.Info($"Stun was successfull so specifying local adress to be bound ({localIPEndPoint.Address}:{localIPEndPoint.Port})");
+                socket = new WebSocketServer(localIPEndPoint.Address, localIPEndPoint.Port);
+                socket.ReuseAddress = true;
+            } else
+            {
+                Log.Info($"Stun was unsuccessfull so continuing normally");
+                socket = new WebSocketServer(System.Net.IPAddress.IPv6Any, port);
+            }
+
+            //socket = new WebSocketServer(System.Net.IPAddress.IPv6Any, port);
             DisableNagleAlgorithm(socket);
             WebSocketService.PacketProcessor = PacketProcessor;
             WebSocketService.PlayerManager = PlayerManager;

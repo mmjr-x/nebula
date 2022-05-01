@@ -9,4 +9,9 @@
     <ProjectReference Include="..\NebulaWorld\NebulaWorld.csproj" SpecificVersion="true" />
     <ProjectReference Include="..\dep\websocket-sharp\websocket-sharp\websocket-sharp.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Reference Include="LumiSoft.Net">
+      <HintPath>..\dep\LumiSoft.Net\LumiSoft.Net.dll</HintPath>
+    </Reference>
+  </ItemGroup>
 </Project>
