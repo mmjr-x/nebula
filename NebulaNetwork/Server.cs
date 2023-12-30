@@ -20,6 +20,8 @@ using NebulaNetwork.Ngrok;
 using NebulaWorld;
 using NebulaWorld.SocialIntegration;
 using Open.Nat;
+//using STUN.Attributes;
+//using STUN;
 using UnityEngine;
 using WebSocketSharp;
 using WebSocketSharp.Server;
@@ -108,6 +110,60 @@ public class Server : NetworkProvider, IServer
 
         ngrokManager = new NgrokManager(Port);
 
+        //using IStunClient5389 client = new StunClient5389TCP(new IPEndPoint(serverIp, server.Port), Result5389.LocalEndPoint, proxy);
+
+        // var test = new TurnClient("stun.l.google.com", "", "", 19302);
+
+        //Log.Info($"Setting up STUN Client 888");
+        ////var test = TurnClient.Create([new GoogleIceServer()]).Result;
+
+        //if (!STUNUtils.TryParseHostAndPort("stun.schlund.de:3478", out IPEndPoint stunEndPoint))
+        //    throw new Exception("Failed to resolve STUN server address");
+
+        //STUNClient.ReceiveTimeout = 500;
+        //var queryResult = STUNClient.Query(stunEndPoint, STUNQueryType.ExactNAT, true, NATTypeDetectionRFC.Rfc5780);
+
+        ////if (queryResult.QueryError != STUNQueryError.Success)
+        ////  throw new Exception("Query Error: " + queryResult.QueryError.ToString());
+
+        //Console.WriteLine("PublicEndPoint: {0}", queryResult.PublicEndPoint);
+        //Console.WriteLine("LocalEndPoint: {0}", queryResult.LocalEndPoint);
+        //Console.WriteLine("NAT Type: {0}", queryResult.NATType);
+
+        //Log.Info($"Are we getting here?");
+
+
+        //Task.Run(async () =>
+        //{
+
+        //    using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(default(CancellationToken));
+        //    _ = 1;
+
+        //    using TcpClient client = new TcpClient();
+        //    client.Connect("stun.services.mozilla.org", 3478);
+        //    NetworkStream stream = client.GetStream();
+        //    byte[] array = new BindingRequest().Encode(this);
+        //    cts.CancelAfter(TimeSpan.FromSeconds(2.0));
+        //    await stream.WriteAsync(array, 0, array.Length, cts.Token);
+        //    await StunMessage.ParseAsync(stream, cts.Token);
+
+        //});
+
+
+        Log.Info($"Setting up STUN Client 888");
+
+        IPAddress ip = Dns.GetHostAddresses(@"stunserver.stunprotocol.org")[0];
+        var client = new STUN.Client.StunClient5389TCP(new IPEndPoint(ip, 3478), new(IPAddress.Any, 0));
+
+        STUN.StunResult.StunResult5389 response = client.BindingTestAsync().Result;
+
+        Log.Info($"BindingTestResult: {response.BindingTestResult}");
+        Log.Info($"MappingBehavior: {response.MappingBehavior}");
+        Log.Info($"LocalEndPoint: {response.LocalEndPoint}");
+        Log.Info($"PublicEndPoint: {response.PublicEndPoint}");
+
+        //socket = new WebSocketServer(IPAddress.IPv6Any, 51110)
+        //socket = new WebSocketServer(queryResult.LocalEndPoint.Address, queryResult.LocalEndPoint.Port)
         socket = new WebSocketServer(IPAddress.IPv6Any, Port)
         {
             Log = { Level = LogLevel.Debug, Output = Log.SocketOutput },
